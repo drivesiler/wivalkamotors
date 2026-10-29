@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo & Gestión de Dealer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .badge-disponible { background-color: #10B981; color: white; }
+        .badge-no-disponible { background-color: #F59E0B; color: white; }
+        .badge-reservado { background-color: #3B82F6; color: white; }
+        .badge-vendido { background-color: #EF4444; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800 antialiased pb-12">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-car-side text-amber-500 text-2xl"></i>
+                <h1 class="font-bold text-lg md:text-xl tracking-tight">AutoDealer <span class="text-amber-500">Pro</span></h1>
+            </div>
+            <button onclick="toggleAdminModal()" class="bg-slate-800 hover:bg-slate-700 text-xs md:text-sm px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-2 transition">
+                <i class="fa-solid fa-lock text-amber-500"></i>
+                <span>Admin</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-2 sm:px-4 py-4">
+
+        <!-- Banner de Filtros / Búsqueda -->
+        <section class="bg-white rounded-xl shadow-sm p-3 mb-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
+                <input type="text" id="search-input" oninput="filterCars()" placeholder="Buscar marca, modelo..." class="border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 col-span-2 md:col-span-1">
+                
+                <select id="filter-type" onchange="filterCars()" class="border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="">Todos los tipos</option>
+                    <option value="Sedán">Sedán</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Camioneta / Pickup">Camioneta / Pickup</option>
+                    <option value="Hatchback">Hatchback</option>
+                    <option value="Deportivo">Deportivo</option>
+                </select>
+
+                <select id="filter-status" onchange="filterCars()" class="border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="">Todos los estatus</option>
+                    <option value="Disponible">Disponible</option>
+                    <option value="No Disponible">No Disponible</option>
+                    <option value="Reservado">Reservado</option>
+                    <option value="Vendido">Vendido</option>
+                </select>
+
+                <select id="filter-payment" onchange="filterCars()" class="border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500 col-span-2 md:col-span-1">
+                    <option value="">Modalidad de Pago</option>
+                    <option value="direct">Venta Directa</option>
+                    <option value="down">Financiamiento (Down Payment)</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Indicador de carga / conexión -->
+        <div id="sync-status" class="hidden text-xs text-center py-1.5 mb-3 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+            <i class="fa-solid fa-rotate spin mr-1"></i> Sincronizando catálogo desde la nube...
+        </div>
+
+        <!-- Grid de Vehículos (Compacto 2 columnas en móvil) -->
+        <section id="car-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+            <!-- Render dinámico desde JS -->
+        </section>
+
+    </main>
+
+    <!-- MODAL DETALLES DEL CARRO (CLIENTE) -->
+    <div id="detail-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="relative bg-black h-48 sm:h-64">
+                <img id="detail-img" src="" class="w-full h-full object-cover">
+                <button onclick="closeDetailModal()" class="absolute top-3 right-3 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <span id="detail-status" class="absolute bottom-3 left-3 px-2.5 py-1 text-xs font-bold rounded-md shadow"></span>
+            </div>
+
+            <div class="p-4 overflow-y-auto space-y-4">
+                <div>
+                    <h2 id="detail-title" class="text-lg font-bold text-slate-900"></h2>
+                    <p id="detail-subtitle" class="text-xs text-slate-500"></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl text-xs">
+                    <div><span class="text-slate-400">Año:</span> <strong id="detail-year" class="text-slate-800"></strong></div>
+                    <div><span class="text-slate-400">Kilometraje:</span> <strong id="detail-km" class="text-slate-800"></strong></div>
+                    <div><span class="text-slate-400">Transmisión:</span> <strong id="detail-trans" class="text-slate-800"></strong></div>
+                    <div><span class="text-slate-400">Color:</span> <strong id="detail-color" class="text-slate-800"></strong></div>
+                </div>
+
+                <!-- Bloque de Precios -->
+                <div class="border-t border-b py-3 flex justify-between items-center">
+                    <div>
+                        <span class="text-xs text-slate-400 block">Precio Contado</span>
+                        <span id="detail-price" class="text-xl font-black text-amber-600"></span>
+                    </div>
+                    <div id="detail-downpayment-container" class="text-right">
+                        <span class="text-xs text-slate-400 block">Inicial Sugerida</span>
+                        <span id="detail-downpayment" class="text-lg font-bold text-emerald-600"></span>
+                    </div>
+                </div>
+
+                <div id="detail-desc" class="text-xs text-slate-600 leading-relaxed"></div>
+
+                <!-- Botón de Contacto WhatsApp -->
+                <a id="detail-whatsapp" href="#" target="_blank" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition text-sm">
+                    <i class="fa-brands fa-whatsapp text-lg"></i>
+                    <span>Consultar disponibilidad por WhatsApp</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PANEL ADMIN / PIN -->
+    <div id="admin-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        
+        <!-- PANTALLA 1: PIN DE SEGURIDAD -->
+        <div id="pin-screen" class="bg-white w-full max-w-xs rounded-2xl p-6 text-center shadow-2xl">
+            <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-lock text-xl"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-base mb-1">Acceso Administrativo</h3>
+            <p class="text-xs text-slate-500 mb-4">Ingresa tu código PIN para continuar</p>
+
+            <input type="password" id="pin-input" maxlength="4" placeholder="••••" class="w-full text-center text-2xl tracking-widest border border-slate-300 rounded-xl py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-amber-500">
+            <p id="pin-error" class="text-red-500 text-xs hidden mb-3">PIN incorrecto. Intenta de nuevo.</p>
+
+            <div class="flex gap-2">
+                <button onclick="closeAdminModal()" class="w-1/2 bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-semibold">Cancelar</button>
+                <button onclick="verifyPIN()" class="w-1/2 bg-amber-500 text-white py-2 rounded-xl text-xs font-semibold hover:bg-amber-600">Ingresar</button>
+            </div>
+        </div>
+
+        <!-- PANTALLA 2: DASHBOARD ADMIN COMPLETO -->
+        <div id="admin-dashboard" class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl max-h-[92vh] flex flex-col hidden">
+            
+            <div class="bg-slate-900 text-white px-4 py-3 flex justify-between items-center rounded-t-2xl">
+                <span class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-500"></i> Panel de Control
+                </span>
+                <button onclick="closeAdminModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-4 overflow-y-auto space-y-6">
+
+                <!-- Configuración Nube -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                    <h4 class="font-bold text-slate-700 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-cloud text-amber-500"></i> Base de Datos Nube (npoint.io)
+                    </h4>
+                    <p class="text-slate-500 mb-2">Pega la URL de tu endpoint para actualizar cambios en vivo:</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="npoint-url" placeholder="https://api.npoint.io/tu_id_aqui" class="flex-1 border rounded-lg px-2.5 py-1.5 focus:outline-none">
+                        <button onclick="saveNpointURL()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-slate-700">Guardar</button>
+                    </div>
+                </div>
+
+                <!-- Formulario Agregar / Editar Carro -->
+                <form id="car-form" onsubmit="handleFormSubmit(event)" class="bg-white border rounded-xl p-4 shadow-sm space-y-3">
+                    <h4 class="font-bold text-slate-800 text-sm border-b pb-2 flex justify-between items-center">
+                        <span id="form-title">Agregar Nuevo Vehículo</span>
+                        <button type="button" onclick="resetForm()" class="text-xs text-amber-600 font-normal">Limpiar</button>
+                    </h4>
+
+                    <input type="hidden" id="car-id">
+
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Marca</label>
+                            <input type="text" id="form-brand" required placeholder="Ej: Toyota" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Modelo</label>
+                            <input type="text" id="form-model" required placeholder="Ej: Corolla" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Año</label>
+                            <input type="number" id="form-year" required placeholder="2020" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Precio ($)</label>
+                            <input type="number" id="form-price" required placeholder="12500" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Down Payment / Inicial ($)</label>
+                            <input type="number" id="form-downpayment" placeholder="3000" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Tipo</label>
+                            <select id="form-type" class="w-full border rounded-lg p-2">
+                                <option value="Sedán">Sedán</option>
+                                <option value="SUV">SUV</option>
+                                <option value="Camioneta / Pickup">Camioneta / Pickup</option>
+                                <option value="Hatchback">Hatchback</option>
+                                <option value="Deportivo">Deportivo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Kilometraje / Millas</label>
+                            <input type="text" id="form-km" placeholder="45,000 km" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Transmisión</label>
+                            <select id="form-trans" class="w-full border rounded-lg p-2">
+                                <option value="Automática">Automática</option>
+                                <option value="Sincrónica">Sincrónica</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Estatus</label>
+                            <select id="form-status" class="w-full border rounded-lg p-2">
+                                <option value="Disponible">Disponible</option>
+                                <option value="No Disponible">No Disponible</option>
+                                <option value="Reservado">Reservado</option>
+                                <option value="Vendido">Vendido</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Botón Subir e Imagen Optimizada -->
+                    <div class="text-xs">
+                        <label class="block font-medium text-slate-600 mb-1">Foto del Vehículo (Se comprime automáticamente a 500x500 px)</label>
+                        <div class="flex gap-2 items-center">
+                            <input type="file" id="form-file" accept="image/*" onchange="processImage(event)" class="hidden">
+                            <button type="button" onclick="document.getElementById('form-file').click()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-camera"></i> Subir / Tomar foto
+                            </button>
+                            <span id="file-name-label" class="text-slate-400 italic">No se ha seleccionado imagen</span>
+                        </div>
+                        <input type="hidden" id="form-img-base64">
+                        <div id="img-preview-container" class="mt-2 hidden">
+                            <img id="img-preview" src="" class="w-16 h-16 object-cover rounded-lg border">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                        Guardar / Actualizar Vehículo
+                    </button>
+                </form>
+
+                <!-- Tabla de Vehículos Existentes -->
+                <div>
+                    <h4 class="font-bold text-slate-800 text-sm mb-2">Inventario Registrado</h4>
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 border-b text-slate-600">
+                                <tr>
+                                    <th class="p-2">Auto</th>
+                                    <th class="p-2">Precio</th>
+                                    <th class="p-2">Estatus</th>
+                                    <th class="p-2 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-car-table" class="divide-y">
+                                <!-- Render filas JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- LÓGICA JAVASCRIPT COMPLETA -->
+    <script>
+        // Clave PIN de seguridad
+        const ADMIN_PIN = "1234";
+
+        // Datos iniciales de demostración
+        let cars = [
+            {
+                id: "1",
+                brand: "Toyota",
+                model: "Corolla LE",
+                year: 2021,
+                price: 15800,
+                downpayment: 4000,
+                type: "Sedán",
+                km: "32,000 mi",
+                trans: "Automática",
+                status: "Disponible",
+                img: "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=500&q=80"
+            },
+            {
+                id: "2",
+                brand: "Ford",
+                model: "Explorer XLT",
+                year: 2019,
+                price: 21000,
+                downpayment: 5500,
+                type: "SUV",
+                km: "48,000 mi",
+                trans: "Automática",
+                status: "No Disponible",
+                img: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=500&q=80"
+            }
+        ];
+
+        // Inicialización
+        document.addEventListener("DOMContentLoaded", () => {
+            loadLocalCars();
+            const savedNpoint = localStorage.getItem("dealer_npoint_url");
+            if (savedNpoint) {
+                document.getElementById("npoint-url").value = savedNpoint;
+                fetchFromNpoint(savedNpoint);
+            } else {
+                renderGrid();
+            }
+        });
+
+        // Cargar almacenamiento local
+        function loadLocalCars() {
+            const savedCars = localStorage.getItem("dealer_cars");
+            if (savedCars) {
+                try { cars = JSON.parse(savedCars); } catch(e){}
+            }
+        }
+
+        // Guardar localmente
+        function saveLocalCars() {
+            localStorage.setItem("dealer_cars", JSON.stringify(cars));
+            renderGrid();
+            syncToNpoint();
+        }
+
+        // Sincronizar con npoint.io
+        async function syncToNpoint() {
+            const url = localStorage.getItem("dealer_npoint_url");
+            if (!url) return;
+
+            const syncStatus = document.getElementById("sync-status");
+            syncStatus.classList.remove("hidden");
+
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cars)
+                });
+            } catch (err) {
+                console.error("Error sincronizando nube:", err);
+            } finally {
+                setTimeout(() => syncStatus.classList.add("hidden"), 1000);
+            }
+        }
+
+        // Cargar desde npoint.io
+        async function fetchFromNpoint(url) {
+            const syncStatus = document.getElementById("sync-status");
+            syncStatus.classList.remove("hidden");
+
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        cars = data;
+                        localStorage.setItem("dealer_cars", JSON.stringify(cars));
+                    }
+                }
+            } catch (e) {
+                console.error("Error cargando npoint:", e);
+            } finally {
+                syncStatus.classList.add("hidden");
+                renderGrid();
+            }
+        }
+
+        function saveNpointURL() {
+            const url = document.getElementById("npoint-url").value.trim();
+            if (url) {
+                localStorage.setItem("dealer_npoint_url", url);
+                fetchFromNpoint(url);
+                alert("URL de npoint.io guardada con éxito.");
+            }
+        }
+
+        // Renderizado del catálogo
+        function renderGrid() {
+            const grid = document.getElementById("car-grid");
+            grid.innerHTML = "";
+
+            const search = document.getElementById("search-input").value.toLowerCase();
+            const type = document.getElementById("filter-type").value;
+            const status = document.getElementById("filter-status").value;
+            const payment = document.getElementById("filter-payment").value;
+
+            const filtered = cars.filter(c => {
+                const matchSearch = `${c.brand} ${c.model}`.toLowerCase().includes(search);
+                const matchType = !type || c.type === type;
+                const matchStatus = !status || c.status === status;
+                const matchPayment = !payment || (payment === 'down' ? c.downpayment > 0 : true);
+                return matchSearch && matchType && matchStatus && matchPayment;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-10 text-slate-400 text-xs">No se encontraron vehículos.</div>`;
+                return;
+            }
+
+            filtered.forEach(c => {
+                let badgeClass = "badge-disponible";
+                if (c.status === "No Disponible") badgeClass = "badge-no-disponible";
+                if (c.status === "Reservado") badgeClass = "badge-reservado";
+                if (c.status === "Vendido") badgeClass = "badge-vendido";
+
+                grid.innerHTML += `
+                    <div onclick="openDetailModal('${c.id}')" class="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer border flex flex-col justify-between">
+                        <div>
+                            <div class="relative h-28 sm:h-36 bg-slate-100">
+                                <img src="${c.img || 'https://via.placeholder.com/500?text=Sin+Foto'}" class="w-full h-full object-cover">
+                                <span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-2 py-0.5 rounded ${badgeClass}">
+                                    ${c.status}
+                                </span>
+                            </div>
+                            <div class="p-2 sm:p-3">
+                                <h3 class="font-bold text-xs sm:text-sm text-slate-800 leading-tight truncate">${c.brand} ${c.model}</h3>
+                                <p class="text-[10px] text-slate-400 mb-1.5">${c.year} • ${c.km || 'N/A'}</p>
+                                
+                                <div class="text-xs">
+                                    <span class="font-black text-amber-600 text-sm">$${Number(c.price).toLocaleString()}</span>
+                                    ${c.downpayment ? `<p class="text-[10px] text-emerald-600 font-semibold">Inicial: $${Number(c.downpayment).toLocaleString()}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function filterCars() {
+            renderGrid();
+        }
+
+        // Modales y Seguridad
+        function toggleAdminModal() {
+            document.getElementById("admin-modal").classList.remove("hidden");
+            document.getElementById("pin-screen").classList.remove("hidden");
+            document.getElementById("admin-dashboard").classList.add("hidden");
+            document.getElementById("pin-input").value = "";
+            document.getElementById("pin-error").classList.add("hidden");
+        }
+
+        function closeAdminModal() {
+            document.getElementById("admin-modal").classList.add("hidden");
+        }
+
+        function verifyPIN() {
+            const input = document.getElementById("pin-input").value;
+            if (input === ADMIN_PIN) {
+                document.getElementById("pin-screen").classList.add("hidden");
+                document.getElementById("admin-dashboard").classList.remove("hidden");
+                renderAdminTable();
+            } else {
+                document.getElementById("pin-error").classList.remove("hidden");
+            }
+        }
+
+        // Compresión automática de imagen a 500x500
+        function processImage(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById("file-name-label").innerText = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = 500;
+                    canvas.height = 500;
+                    const ctx = canvas.getContext("2d");
+
+                    // Dibujar centrado recortando cuadrado
+                    const min = Math.min(img.width, img.height);
+                    const sx = (img.width - min) / 2;
+                    const sy = (img.height - min) / 2;
+
+                    ctx.drawImage(img, sx, sy, min, min, 0, 0, 500, 500);
+
+                    const resizedBase64 = canvas.toDataURL("image/jpeg", 0.75); // Alta velocidad/bajo peso
+                    document.getElementById("form-img-base64").value = resizedBase64;
+                    document.getElementById("img-preview").src = resizedBase64;
+                    document.getElementById("img-preview-container").classList.remove("hidden");
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // Guardar Carro desde Admin
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById("car-id").value || Date.now().toString();
+            const brand = document.getElementById("form-brand").value;
+            const model = document.getElementById("form-model").value;
+            const year = parseInt(document.getElementById("form-year").value);
+            const price = parseFloat(document.getElementById("form-price").value);
+            const downpayment = parseFloat(document.getElementById("form-downpayment").value) || 0;
+            const type = document.getElementById("form-type").value;
+            const km = document.getElementById("form-km").value;
+            const trans = document.getElementById("form-trans").value;
+            const status = document.getElementById("form-status").value;
+            const img = document.getElementById("form-img-base64").value || 'https://via.placeholder.com/500?text=Sin+Foto';
+
+            const existingIndex = cars.findIndex(c => c.id === id);
+            const carData = { id, brand, model, year, price, downpayment, type, km, trans, status, img };
+
+            if (existingIndex > -1) {
+                cars[existingIndex] = carData;
+            } else {
+                cars.push(carData);
+            }
+
+            saveLocalCars();
+            resetForm();
+            renderAdminTable();
+        }
+
+        function resetForm() {
+            document.getElementById("car-form").reset();
+            document.getElementById("car-id").value = "";
+            document.getElementById("form-img-base64").value = "";
+            document.getElementById("img-preview-container").classList.add("hidden");
+            document.getElementById("file-name-label").innerText = "No se ha seleccionado imagen";
+            document.getElementById("form-title").innerText = "Agregar Nuevo Vehículo";
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById("admin-car-table");
+            tbody.innerHTML = "";
+
+            cars.forEach(c => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="p-2 font-medium">${c.brand} ${c.model} (${c.year})</td>
+                        <td class="p-2">$${Number(c.price).toLocaleString()}</td>
+                        <td class="p-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded font-bold ${c.status === 'Disponible' ? 'bg-emerald-100 text-emerald-700' : c.status === 'No Disponible' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">
+                                ${c.status}
+                            </span>
+                        </td>
+                        <td class="p-2 text-right space-x-1">
+                            <button onclick="editCar('${c.id}')" class="text-blue-600 hover:text-blue-800"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteCar('${c.id}')" class="text-red-600 hover:text-red-800"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editCar(id) {
+            const c = cars.find(item => item.id === id);
+            if (!c) return;
+
+            document.getElementById("car-id").value = c.id;
+            document.getElementById("form-brand").value = c.brand;
+            document.getElementById("form-model").value = c.model;
+            document.getElementById("form-year").value = c.year;
+            document.getElementById("form-price").value = c.price;
+            document.getElementById("form-downpayment").value = c.downpayment || "";
+            document.getElementById("form-type").value = c.type;
+            document.getElementById("form-km").value = c.km || "";
+            document.getElementById("form-trans").value = c.trans;
+            document.getElementById("form-status").value = c.status;
+            document.getElementById("form-img-base64").value = c.img;
+
+            if (c.img) {
+                document.getElementById("img-preview").src = c.img;
+                document.getElementById("img-preview-container").classList.remove("hidden");
+            }
+
+            document.getElementById("form-title").innerText = "Editar Vehículo";
+        }
+
+        function deleteCar(id) {
+            if (confirm("¿Seguro que deseas eliminar este vehículo?")) {
+                cars = cars.filter(c => c.id !== id);
+                saveLocalCars();
+                renderAdminTable();
+            }
+        }
+
+        // Modal Detalles Cliente
+        function openDetailModal(id) {
+            const c = cars.find(item => item.id === id);
+            if (!c) return;
+
+            document.getElementById("detail-img").src = c.img || 'https://via.placeholder.com/500?text=Sin+Foto';
+            document.getElementById("detail-title").innerText = `${c.brand} ${c.model}`;
+            document.getElementById("detail-subtitle").innerText = `${c.type} • ${c.year}`;
+            document.getElementById("detail-year").innerText = c.year;
+            document.getElementById("detail-km").innerText = c.km || 'N/A';
+            document.getElementById("detail-trans").innerText = c.trans;
+            document.getElementById("detail-color").innerText = "A consultar";
+            document.getElementById("detail-price").innerText = `$${Number(c.price).toLocaleString()}`;
+            
+            const dpContainer = document.getElementById("detail-downpayment-container");
+            if (c.downpayment) {
+                document.getElementById("detail-downpayment").innerText = `$${Number(c.downpayment).toLocaleString()}`;
+                dpContainer.classList.remove("hidden");
+            } else {
+                dpContainer.classList.add("hidden");
+            }
+
+            const statusBadge = document.getElementById("detail-status");
+            statusBadge.innerText = c.status;
+            statusBadge.className = `absolute bottom-3 left-3 px-2.5 py-1 text-xs font-bold rounded-md shadow badge-${c.status.toLowerCase().replace(" ", "-")}`;
+
+            // Enlace de WhatsApp
+            const msg = encodeURIComponent(`Hola, estoy interesado en el vehículo: ${c.brand} ${c.model} (${c.year}) de $${c.price}. ¿Sigue disponible?`);
+            document.getElementById("detail-whatsapp").href = `https://wa.me/?text=${msg}`;
+
+            document.getElementById("detail-modal").classList.remove("hidden");
+        }
+
+        function closeDetailModal() {
+            document.getElementById("detail-modal").classList.add("hidden");
+        }
+    </script>
+</body>
+</html>
