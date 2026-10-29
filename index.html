@@ -60,6 +60,7 @@
                     <option value="">Modalidad de Pago</option>
                     <option value="direct">Venta Directa</option>
                     <option value="down">Financiamiento (Down Payment)</option>
+                    <option value="sale">En Oferta / Sale</option>
                 </select>
             </div>
         </section>
@@ -84,7 +85,12 @@
                 <button onclick="closeDetailModal()" class="absolute top-3 right-3 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
-                <span id="detail-status" class="absolute bottom-3 left-3 px-2.5 py-1 text-xs font-bold rounded-md shadow"></span>
+                <div class="absolute bottom-3 left-3 flex gap-1.5">
+                    <span id="detail-status" class="px-2.5 py-1 text-xs font-bold rounded-md shadow"></span>
+                    <span id="detail-sale-badge" class="px-2.5 py-1 text-xs font-bold rounded-md shadow bg-rose-600 text-white uppercase hidden">
+                        <i class="fa-solid fa-fire mr-1"></i>Oferta
+                    </span>
+                </div>
             </div>
 
             <div class="p-4 overflow-y-auto space-y-4">
@@ -103,8 +109,11 @@
                 <!-- Bloque de Precios -->
                 <div class="border-t border-b py-3 flex justify-between items-center">
                     <div>
-                        <span class="text-xs text-slate-400 block">Precio Contado</span>
-                        <span id="detail-price" class="text-xl font-black text-amber-600"></span>
+                        <span class="text-xs text-slate-400 block">Precio de Contado</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="detail-old-price" class="text-xs line-through text-slate-400 hidden"></span>
+                            <span id="detail-price" class="text-xl font-black text-amber-600"></span>
+                        </div>
                     </div>
                     <div id="detail-downpayment-container" class="text-right">
                         <span class="text-xs text-slate-400 block">Inicial Sugerida</span>
@@ -192,8 +201,12 @@
                             <input type="number" id="form-year" required placeholder="2020" class="w-full border rounded-lg p-2">
                         </div>
                         <div>
-                            <label class="block font-medium text-slate-600 mb-1">Precio ($)</label>
-                            <input type="number" id="form-price" required placeholder="12500" class="w-full border rounded-lg p-2">
+                            <label class="block font-medium text-slate-600 mb-1">Precio Normal ($)</label>
+                            <input type="number" id="form-price" required placeholder="14000" class="w-full border rounded-lg p-2">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">Precio Sale / Oferta ($)</label>
+                            <input type="number" id="form-sale-price" placeholder="12500 (Opcional)" class="w-full border rounded-lg p-2 bg-rose-50 border-rose-200">
                         </div>
                         <div>
                             <label class="block font-medium text-slate-600 mb-1">Down Payment / Inicial ($)</label>
@@ -260,7 +273,8 @@
                             <thead class="bg-slate-100 border-b text-slate-600">
                                 <tr>
                                     <th class="p-2">Auto</th>
-                                    <th class="p-2">Precio</th>
+                                    <th class="p-2">Precio Normal</th>
+                                    <th class="p-2">Oferta (Sale)</th>
                                     <th class="p-2">Estatus</th>
                                     <th class="p-2 text-right">Acciones</th>
                                 </tr>
@@ -288,7 +302,8 @@
                 brand: "Toyota",
                 model: "Corolla LE",
                 year: 2021,
-                price: 15800,
+                price: 16800,
+                salePrice: 15200,
                 downpayment: 4000,
                 type: "Sedán",
                 km: "32,000 mi",
@@ -302,6 +317,7 @@
                 model: "Explorer XLT",
                 year: 2019,
                 price: 21000,
+                salePrice: null,
                 downpayment: 5500,
                 type: "SUV",
                 km: "48,000 mi",
@@ -404,7 +420,9 @@
                 const matchSearch = `${c.brand} ${c.model}`.toLowerCase().includes(search);
                 const matchType = !type || c.type === type;
                 const matchStatus = !status || c.status === status;
-                const matchPayment = !payment || (payment === 'down' ? c.downpayment > 0 : true);
+                let matchPayment = true;
+                if (payment === 'down') matchPayment = c.downpayment > 0;
+                if (payment === 'sale') matchPayment = c.salePrice && c.salePrice > 0;
                 return matchSearch && matchType && matchStatus && matchPayment;
             });
 
@@ -419,6 +437,9 @@
                 if (c.status === "Reservado") badgeClass = "badge-reservado";
                 if (c.status === "Vendido") badgeClass = "badge-vendido";
 
+                const hasSale = c.salePrice && c.salePrice > 0;
+                const currentPrice = hasSale ? c.salePrice : c.price;
+
                 grid.innerHTML += `
                     <div onclick="openDetailModal('${c.id}')" class="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer border flex flex-col justify-between">
                         <div>
@@ -427,13 +448,21 @@
                                 <span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-2 py-0.5 rounded ${badgeClass}">
                                     ${c.status}
                                 </span>
+                                ${hasSale ? `
+                                    <span class="absolute top-1.5 right-1.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow uppercase">
+                                        Sale
+                                    </span>
+                                ` : ''}
                             </div>
                             <div class="p-2 sm:p-3">
                                 <h3 class="font-bold text-xs sm:text-sm text-slate-800 leading-tight truncate">${c.brand} ${c.model}</h3>
                                 <p class="text-[10px] text-slate-400 mb-1.5">${c.year} • ${c.km || 'N/A'}</p>
                                 
                                 <div class="text-xs">
-                                    <span class="font-black text-amber-600 text-sm">$${Number(c.price).toLocaleString()}</span>
+                                    <div class="flex items-baseline gap-1">
+                                        ${hasSale ? `<span class="text-[10px] line-through text-slate-400">$${Number(c.price).toLocaleString()}</span>` : ''}
+                                        <span class="font-black ${hasSale ? 'text-rose-600' : 'text-amber-600'} text-sm">$${Number(currentPrice).toLocaleString()}</span>
+                                    </div>
                                     ${c.downpayment ? `<p class="text-[10px] text-emerald-600 font-semibold">Inicial: $${Number(c.downpayment).toLocaleString()}</p>` : ''}
                                 </div>
                             </div>
@@ -487,14 +516,13 @@
                     canvas.height = 500;
                     const ctx = canvas.getContext("2d");
 
-                    // Dibujar centrado recortando cuadrado
                     const min = Math.min(img.width, img.height);
                     const sx = (img.width - min) / 2;
                     const sy = (img.height - min) / 2;
 
                     ctx.drawImage(img, sx, sy, min, min, 0, 0, 500, 500);
 
-                    const resizedBase64 = canvas.toDataURL("image/jpeg", 0.75); // Alta velocidad/bajo peso
+                    const resizedBase64 = canvas.toDataURL("image/jpeg", 0.75);
                     document.getElementById("form-img-base64").value = resizedBase64;
                     document.getElementById("img-preview").src = resizedBase64;
                     document.getElementById("img-preview-container").classList.remove("hidden");
@@ -512,6 +540,8 @@
             const model = document.getElementById("form-model").value;
             const year = parseInt(document.getElementById("form-year").value);
             const price = parseFloat(document.getElementById("form-price").value);
+            const salePriceVal = document.getElementById("form-sale-price").value;
+            const salePrice = salePriceVal ? parseFloat(salePriceVal) : null;
             const downpayment = parseFloat(document.getElementById("form-downpayment").value) || 0;
             const type = document.getElementById("form-type").value;
             const km = document.getElementById("form-km").value;
@@ -520,7 +550,7 @@
             const img = document.getElementById("form-img-base64").value || 'https://via.placeholder.com/500?text=Sin+Foto';
 
             const existingIndex = cars.findIndex(c => c.id === id);
-            const carData = { id, brand, model, year, price, downpayment, type, km, trans, status, img };
+            const carData = { id, brand, model, year, price, salePrice, downpayment, type, km, trans, status, img };
 
             if (existingIndex > -1) {
                 cars[existingIndex] = carData;
@@ -551,6 +581,7 @@
                     <tr>
                         <td class="p-2 font-medium">${c.brand} ${c.model} (${c.year})</td>
                         <td class="p-2">$${Number(c.price).toLocaleString()}</td>
+                        <td class="p-2 font-bold text-rose-600">${c.salePrice ? `$${Number(c.salePrice).toLocaleString()}` : '-'}</td>
                         <td class="p-2">
                             <span class="text-[10px] px-2 py-0.5 rounded font-bold ${c.status === 'Disponible' ? 'bg-emerald-100 text-emerald-700' : c.status === 'No Disponible' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">
                                 ${c.status}
@@ -574,6 +605,7 @@
             document.getElementById("form-model").value = c.model;
             document.getElementById("form-year").value = c.year;
             document.getElementById("form-price").value = c.price;
+            document.getElementById("form-sale-price").value = c.salePrice || "";
             document.getElementById("form-downpayment").value = c.downpayment || "";
             document.getElementById("form-type").value = c.type;
             document.getElementById("form-km").value = c.km || "";
@@ -602,6 +634,8 @@
             const c = cars.find(item => item.id === id);
             if (!c) return;
 
+            const hasSale = c.salePrice && c.salePrice > 0;
+
             document.getElementById("detail-img").src = c.img || 'https://via.placeholder.com/500?text=Sin+Foto';
             document.getElementById("detail-title").innerText = `${c.brand} ${c.model}`;
             document.getElementById("detail-subtitle").innerText = `${c.type} • ${c.year}`;
@@ -609,7 +643,22 @@
             document.getElementById("detail-km").innerText = c.km || 'N/A';
             document.getElementById("detail-trans").innerText = c.trans;
             document.getElementById("detail-color").innerText = "A consultar";
-            document.getElementById("detail-price").innerText = `$${Number(c.price).toLocaleString()}`;
+
+            const oldPriceElem = document.getElementById("detail-old-price");
+            const priceElem = document.getElementById("detail-price");
+
+            if (hasSale) {
+                oldPriceElem.innerText = `$${Number(c.price).toLocaleString()}`;
+                oldPriceElem.classList.remove("hidden");
+                priceElem.innerText = `$${Number(c.salePrice).toLocaleString()}`;
+                priceElem.className = "text-xl font-black text-rose-600";
+                document.getElementById("detail-sale-badge").classList.remove("hidden");
+            } else {
+                oldPriceElem.classList.add("hidden");
+                priceElem.innerText = `$${Number(c.price).toLocaleString()}`;
+                priceElem.className = "text-xl font-black text-amber-600";
+                document.getElementById("detail-sale-badge").classList.add("hidden");
+            }
             
             const dpContainer = document.getElementById("detail-downpayment-container");
             if (c.downpayment) {
@@ -621,10 +670,11 @@
 
             const statusBadge = document.getElementById("detail-status");
             statusBadge.innerText = c.status;
-            statusBadge.className = `absolute bottom-3 left-3 px-2.5 py-1 text-xs font-bold rounded-md shadow badge-${c.status.toLowerCase().replace(" ", "-")}`;
+            statusBadge.className = `px-2.5 py-1 text-xs font-bold rounded-md shadow badge-${c.status.toLowerCase().replace(" ", "-")}`;
 
             // Enlace de WhatsApp
-            const msg = encodeURIComponent(`Hola, estoy interesado en el vehículo: ${c.brand} ${c.model} (${c.year}) de $${c.price}. ¿Sigue disponible?`);
+            const activePrice = hasSale ? c.salePrice : c.price;
+            const msg = encodeURIComponent(`Hola, estoy interesado en el vehículo: ${c.brand} ${c.model} (${c.year}) a precio de $${activePrice}. ¿Sigue disponible?`);
             document.getElementById("detail-whatsapp").href = `https://wa.me/?text=${msg}`;
 
             document.getElementById("detail-modal").classList.remove("hidden");
